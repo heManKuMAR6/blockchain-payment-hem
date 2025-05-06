@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ethers } from 'ethers';
 import contractArtifact from './abi/HemanthToken.json';
+import tokenLogo from './assets/token.png'; // Ensure logo path is valid
 
 const contractAddress = "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512";
 const tokenAbi = contractArtifact.abi;
@@ -25,13 +26,22 @@ function App() {
   const [copied, setCopied] = useState(false);
   const [theme, setTheme] = useState("light");
   const [toast, setToast] = useState("");
+  const [filter, setFilter] = useState("all");
 
   const showToast = (message) => {
     setToast(message);
     setTimeout(() => setToast(""), 3000);
   };
 
-  const toggleTheme = () => setTheme(theme === "light" ? "dark" : "light");
+  const toggleTheme = () => {
+    const newTheme = theme === "light" ? "dark" : "light";
+    setTheme(newTheme);
+    document.documentElement.classList.toggle("dark", newTheme === "dark");
+  };
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+  }, [theme]);
 
   const connectWallet = async () => {
     try {
@@ -153,44 +163,55 @@ function App() {
     }
   }, [tokenContract, account, localHistory]);
 
+  const filteredHistory = history.filter(tx => {
+    if (filter === "sent") return tx.from.toLowerCase() === account.toLowerCase();
+    if (filter === "received") return tx.to.toLowerCase() === account.toLowerCase();
+    return true;
+  });
+
   return (
-    <div className={theme === "dark" ? "bg-black text-white min-h-screen p-8" : "bg-white text-black min-h-screen p-8"}>
-      <button onClick={toggleTheme} style={{ float: 'right' }}>
-        {theme === "light" ? "🌙 Dark Mode" : "☀️ Light Mode"}
-      </button>
-      <h1 className="text-3xl font-bold mb-4">💰 {tokenName || "Token"} Wallet</h1>
+    <div className={`min-h-screen p-6 transition-all duration-300 ${theme === "dark" ? "bg-gray-900 text-white" : "bg-gray-100 text-black"}`}>
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center gap-3">
+          <img src={tokenLogo} alt="Token" className="h-10 w-10" />
+          <h1 className="text-3xl font-bold">{tokenName || "Token"} Wallet</h1>
+        </div>
+        <button onClick={toggleTheme} className="bg-gray-300 dark:bg-gray-700 px-4 py-2 rounded-md shadow hover:scale-105 transition-transform">
+          {theme === "light" ? "🌙 Dark Mode" : "☀️ Light Mode"}
+        </button>
+      </div>
 
       {!account && (
-        <button onClick={connectWallet} className="bg-blue-600 text-white px-4 py-2 rounded">
-          Connect MetaMask
-        </button>
+        <button onClick={connectWallet} className="bg-blue-600 text-white px-6 py-3 rounded-md shadow hover:bg-blue-700">Connect MetaMask</button>
       )}
 
       {account && (
-        <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded shadow-md">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-6">
           <p><strong>Account:</strong> {account} <button onClick={copyToClipboard}>📋</button> {copied && "Copied!"}</p>
           <p><strong>Balance:</strong> {balance} {tokenSymbol}</p>
-          <p><strong>Token:</strong> {tokenName}</p>
         </div>
       )}
 
       {account && (
-        <div className="mt-6">
-          <h3 className="text-xl font-semibold mb-2">Send {tokenSymbol} Tokens</h3>
-          <form onSubmit={handleTransfer} className="space-y-2">
-            <input type="text" placeholder="Recipient address" value={toAddress} onChange={(e) => setToAddress(e.target.value)} className="w-full p-2 border rounded" required />
-            <input type="number" placeholder={`Amount (e.g. 100 ${tokenSymbol})`} value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full p-2 border rounded" required />
-            <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded">Send</button>
-          </form>
-        </div>
+        <form onSubmit={handleTransfer} className="space-y-4 mb-8">
+          <input type="text" placeholder="Recipient address" value={toAddress} onChange={(e) => setToAddress(e.target.value)} className="w-full p-3 border rounded dark:bg-gray-700 dark:text-white" required />
+          <input type="number" placeholder={`Amount (e.g. 100 ${tokenSymbol})`} value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full p-3 border rounded dark:bg-gray-700 dark:text-white" required />
+          <button type="submit" className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Send</button>
+        </form>
       )}
 
       {account && (
-        <div className="mt-8">
+        <div>
+          <div className="flex gap-4 mb-4">
+            <button onClick={() => setFilter("all")} className={`px-4 py-2 rounded ${filter === "all" ? "bg-blue-600 text-white" : "bg-gray-300 dark:bg-gray-700"}`}>All</button>
+            <button onClick={() => setFilter("sent")} className={`px-4 py-2 rounded ${filter === "sent" ? "bg-blue-600 text-white" : "bg-gray-300 dark:bg-gray-700"}`}>Sent</button>
+            <button onClick={() => setFilter("received")} className={`px-4 py-2 rounded ${filter === "received" ? "bg-blue-600 text-white" : "bg-gray-300 dark:bg-gray-700"}`}>Received</button>
+          </div>
+
           <h3 className="text-xl font-semibold mb-2">📜 Transaction History</h3>
-          {history.length === 0 && <p>No recent transactions found.</p>}
-          {history.map((tx, index) => (
-            <div key={index} className="bg-white dark:bg-gray-900 p-4 mb-2 border rounded shadow">
+          {filteredHistory.length === 0 && <p>No transactions to display.</p>}
+          {filteredHistory.map((tx, index) => (
+            <div key={index} className="bg-white dark:bg-gray-800 p-4 mb-3 border rounded-lg shadow hover:scale-[1.01] transition-all">
               <p><strong>From:</strong> {tx.fromName}</p>
               <p><strong>To:</strong> {tx.toName}</p>
               <p><strong>Amount:</strong> {tx.value} {tokenSymbol}</p>
@@ -207,7 +228,7 @@ function App() {
       )}
 
       {toast && (
-        <div className="fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded shadow">
+        <div className="fixed bottom-6 right-6 bg-blue-600 text-white px-6 py-3 rounded shadow-lg animate-pulse">
           {toast}
         </div>
       )}
